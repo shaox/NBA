@@ -1,0 +1,195 @@
+import libsvm.*;
+import libsvm.svm_model;
+import libsvm.svm_node;
+import libsvm.svm_parameter;
+import libsvm.svm_problem;
+import Jama.Matrix;
+
+ 
+//Linear Regression
+
+public class regr_training{
+	static Matrix X;
+	static Matrix Y;
+	static Matrix theta;
+	
+	static int N;//number of input entries.
+	static int part_nums;//partition number.
+	
+	static double lambda;//lambda for ridge regression.
+	public static void cross_validation_linRegr(){
+		//k fold
+		Matrix temp_X;
+		Matrix temp_Y;
+		Matrix temp_Z;
+		double min_MSE =10;
+		int begin_index;
+		int end_index;
+		
+		int k =10;
+		N = Y.getRowDimension();
+		
+		part_nums=N/k;
+		
+		for (int i = 0; i+1< N; i ++){
+			double temp;
+			begin_index = i*part_nums;
+			end_index = (i+1)*part_nums;
+			temp_X = X.getMatrix(begin_index, end_index,0,X.getColumnDimension()-1);
+			temp_Y = Y.getMatrix(begin_index, end_index,0,Y.getColumnDimension()-1);
+			theta = impLinRegr(temp_X,temp_Y);		
+			temp = MSE_evaluation(temp_Y,theta,temp_X);
+			if(temp < min_MSE){
+				min_MSE = temp;
+				temp_Z = theta;
+			}		
+		}
+	}
+	
+	
+	public static void readData(double [][] inputX, double[][] inputY){
+		X=new Matrix(inputX);
+		Y=new Matrix(inputY);
+	}
+	
+	//Linear Regression.
+	public static Matrix impLinRegr(Matrix temp_X, Matrix temp_Y){
+	
+		//(x'x)^x'y
+		theta = ((temp_X.transpose())
+				.times(temp_X))
+				.inverse()
+				.times(temp_X.transpose())
+				.times(temp_Y);
+		
+		return theta;	
+	}
+	
+	//Ridge Linear Regression.
+	//need to set lambda before to implement.
+	public static Matrix impRidgeRegr(Matrix temp_X, Matrix temp_Y){
+		int x_row = temp_X.getRowDimension();
+		Matrix indentity = Matrix.identity(x_row, x_row);
+		
+		theta = ((((temp_X.transpose())
+				.times(temp_X)
+				.plus(indentity.times(lambda)))
+				.inverse())
+				.times(temp_X.transpose()))
+				.times(temp_Y)
+				;
+		return theta;	
+	}
+	
+	
+/*	//need to set lambda before to implement.
+	public static Matrix impRidgeKernelRegr(Matrix temp_X, Matrix temp_Y){
+		//Computes alpha = (K + lambda I)^-1 Y. where K is a kernel function.
+		Matrix Kernel=null;
+		int x_row = temp_X.getRowDimension();
+		Matrix indentity = Matrix.identity(x_row, x_row);
+		
+		
+		//Gaussian kernel
+		
+		//DoubleMatrix d = Geometry.pairwiseSquaredDistances(X.transpose(), Z.transpose());
+		return exp(d.div(w).neg());
+		
+		return (Kernel
+				.plus(indentity.times(lambda)))
+				.inverse();
+	}
+	
+	public static double gaussinaKern(int w, Matrix temp_X, Matrix temp_Z){
+		//temp_X and temp_Z are row vectors
+		
+		double dis = ((temp_X.transpose().minus(temp_Z.transpose()))).norm1();
+		
+		return Math.exp(-dis/w);
+		
+	}*/
+	
+	
+	
+	public static double MSE_evaluation(Matrix expY,Matrix theta,Matrix testX){
+		
+		Matrix A = expY.minus(testX.times(theta));
+		int N = expY.getRowDimension();
+		double result = (A.times(A.transpose()).get(0, 0))/N; 
+		
+		return result;
+	}
+
+	
+	////////////////////////////////////////////////////////////libSVM////////////////////////////
+	
+	public static void cross_validation_svr(){
+		//k fold
+		double[][] data = null;
+		double[][] train;
+		double[][] test;
+		int part_nums;
+		int nums_of_col = data[0].length;
+		svm_model model;
+		
+		double min_MSE =10;
+		int begin_index;
+		int end_index;
+		
+		int k =10;		
+		part_nums=data.length/k;
+		train=new double[part_nums][nums_of_col];
+		test=new double[data.length-part_nums][nums_of_col];
+				
+		 
+		for (int i = 0; i+1< N; i ++){
+			double temp;
+			begin_index = i*part_nums;
+			end_index = (i+1)*part_nums;
+			
+			System.arraycopy(data,begin_index,train,0,part_nums-1);
+			model = svrTrain(train);
+			
+			svm.svm_predict(model, arg1);
+			
+//			theta = impLinRegr(temp_X,temp_Y);		
+//			temp = MSE_evaluation(temp_Y,theta,temp_X);
+//			if(temp < min_MSE){
+//				min_MSE = temp;
+//				temp_Z = theta;
+//			}		
+		}
+	}
+	
+	public static svm_model svrTrain(double[][] train){
+		 svm_problem prob = new svm_problem();
+		 int num_of_data = train.length;
+		 int num_of_features= train[0].length-1;///total length - 1(y);
+		 svm_parameter param = new svm_parameter();
+		 param.C = 1;
+		 param.cache_size = 20000;
+		 param.svm_type = svm_parameter.NU_SVC;
+		 param.kernel_type=svm_parameter.RBF;
+		 param.gamma = 60;//need to set this one.
+		 prob.y = new double[num_of_data];
+		 prob.l = num_of_data;
+		 prob.x = new svm_node[num_of_data][]; 
+		 
+		 for (int i = 0; i < num_of_data; i++){ 
+			 prob.y[i] = train[i][0];
+			 prob.x[i] = new svm_node[num_of_features];
+			 for(int j =1; j< num_of_features;j++){
+				 svm_node node = new svm_node();
+		         node.index = j;
+		         node.value = train[i][j];
+				 prob.x[i][j-1]=node;
+			 }
+		 }
+		 
+		 return svm.svm_train(prob, param);
+		 
+	}
+	
+	
+	
+}
